@@ -14,13 +14,17 @@ from typing import Iterable
 
 EVENTS: dict[str, re.Pattern[str]] = {
     "crash": re.compile(r"---\s*crash at|hardfault|hard fault", re.I),
-    "request_stall": re.compile(
-        r"http:.*(?:request stalled|deadline exceeded)|watchdog .*stalled", re.I
+    "operation_stall": re.compile(
+        r"http:.*(?:request stalled|deadline exceeded)|operation .*stalled|"
+        r"watchdog .*stalled",
+        re.I,
     ),
     "connect_stall": re.compile(r"connect(?:ion)? (?:stalled|timeout)", re.I),
     "send_stall": re.compile(r"send stalled|outbound .* stalled", re.I),
     "session_limit": re.compile(r"session limit|quarantine full|cleanup busy", re.I),
-    "poisoned": re.compile(r"poison(?:ed|ing)|unsafe native.*lifecycle", re.I),
+    "incomplete_lifecycle": re.compile(
+        r"poison(?:ed|ing)|unsafe native.*lifecycle", re.I
+    ),
     "missing_terminal": re.compile(
         r"missing terminal|without callback|incomplete handle|pinned", re.I
     ),
@@ -32,13 +36,22 @@ EVENTS: dict[str, re.Pattern[str]] = {
 }
 
 METRIC = re.compile(r"\b([A-Za-z][A-Za-z0-9_]*)=(-?\d+(?:\.\d+)?)(%|ms|s|kb)?\b")
-NETWORK_PREFIXES = ("http_", "tcp_", "stream_", "wifi_")
-EXTRA_METRICS = {
-    "underruns",
+DEFAULT_METRIC_PREFIXES = (
+    "http_",
+    "tcp_",
+    "net_",
+    "network_",
+    "conn_",
+    "socket_",
+    "request_",
+    "operation_",
+    "app_",
+)
+DEFAULT_EXTRA_METRICS = {
     "lua_kb",
     "heap_block_kb",
-    "compressed_min",
-    "pcm_min",
+    "frame_ms",
+    "update_ms",
 }
 
 
@@ -54,7 +67,12 @@ def iter_lines(paths: list[str]) -> Iterable[tuple[str, int, str]]:
                 yield str(path), number, line.rstrip("\n")
 
 
-def analyze(paths: list[str], chronology_limit: int) -> dict[str, object]:
+def analyze(
+    paths: list[str],
+    chronology_limit: int,
+    metric_prefixes: tuple[str, ...],
+    extra_metrics: set[str],
+) -> dict[str, object]:
     events: Counter[str] = Counter()
     latest: dict[str, float] = {}
     maxima: dict[str, float] = {}
@@ -76,7 +94,7 @@ def analyze(paths: list[str], chronology_limit: int) -> dict[str, object]:
                 chronology.pop(0)
 
         for name, raw_value, _unit in METRIC.findall(line):
-            if not (name.startswith(NETWORK_PREFIXES) or name in EXTRA_METRICS):
+            if not (name.startswith(metric_prefixes) or name in extra_metrics):
                 continue
             value = float(raw_value)
             latest[name] = value
@@ -132,11 +150,27 @@ def main() -> int:
     parser.add_argument(
         "--recent", type=int, default=20, metavar="N", help="Keep the last N matching lines"
     )
+    parser.add_argument(
+        "--metric-prefix",
+        action="append",
+        default=[],
+        metavar="PREFIX",
+        help="Also collect key=value metrics beginning with PREFIX; repeat as needed",
+    )
+    parser.add_argument(
+        "--metric",
+        action="append",
+        default=[],
+        metavar="NAME",
+        help="Also collect an exact key=value metric; repeat as needed",
+    )
     args = parser.parse_args()
     if args.recent < 0:
         parser.error("--recent must be non-negative")
     try:
-        summary = analyze(args.logs, args.recent)
+        metric_prefixes = DEFAULT_METRIC_PREFIXES + tuple(args.metric_prefix)
+        extra_metrics = DEFAULT_EXTRA_METRICS.union(args.metric)
+        summary = analyze(args.logs, args.recent, metric_prefixes, extra_metrics)
     except OSError as error:
         parser.error(str(error))
     if args.json:

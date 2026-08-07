@@ -1,4 +1,4 @@
 interface:
   display_name: "Playdate Network Stability"
   short_description: "Diagnose and harden Playdate networking"
-  default_prompt: "Use $playdate-network-stability to diagnose and harden this Playdate networking failure."
+  default_prompt: "Use $playdate-network-stability to investigate and harden this Playdate HTTP/TCP reliability problem."
