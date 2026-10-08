@@ -6,6 +6,24 @@ below point to Playdate SDK 3.1.1 and may differ from newer headers:
 - [C networking API](https://sdk.play.date/3.1.1/Inside%20Playdate%20with%20C.html#_networking)
 - [Lua networking API](https://sdk.play.date/3.1.1/Inside%20Playdate.html#networking)
 
+## SDK/OS 3.1.2 HTTP fixes
+
+Panic's [changelog](https://sdk.play.date/changelog/) lists SDK/OS 3.1.2,
+released September 16, 2026, with two HTTP parser fixes:
+
+- An out-of-bounds stack-buffer read in chunked HTTP decoding, described by
+  Panic as likely harmless.
+- An out-of-bounds write in `prv_simple_http_response_cb` when the server omits
+  `Content-Length`.
+
+Include chunked and connection-delimited responses without `Content-Length` in
+regression tests. Record the build SDK and installed device OS separately;
+rebuilding with SDK 3.1.2 does not establish that the device firmware is updated.
+The changelog does not establish a fix for callback ownership, wrapper retention,
+or the allocation-associated crash observed in Nightcap on OS 3.1.1. Keep those
+mitigations until the original reproduction and extended device soak pass on
+the newer OS. Recheck the versioned API documentation before changing semantics.
+
 ## Capacity and Wi-Fi state
 
 - The 3.1.1 C documentation states that the device supports up to four

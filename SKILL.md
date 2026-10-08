@@ -44,9 +44,11 @@ quarantine, and reuse as distinct states. Do not treat a local timeout or
 `close()` return as proof that firmware has finished using an object or callback.
 
 Permit reuse only after the required transport terminal events and application
-integrity checks arrive. Keep an incomplete object and its callbacks reachable
-in a bounded quarantine. Refuse, defer, or degrade lower-priority work when the
-quarantine consumes the connection budget.
+integrity checks arrive, plus any callback quiet interval supported by device
+testing. Keep callback closures stable for each wrapper and restart the quiet
+interval after late callbacks. Keep an incomplete object and its callbacks
+reachable in a bounded quarantine. Refuse, defer, or degrade lower-priority work
+when the quarantine consumes the connection budget.
 
 Read [references/lifecycle-patterns.md](references/lifecycle-patterns.md) before
 implementing cleanup, retries, cancellation, operation replacement, background
@@ -76,6 +78,13 @@ is unnecessary, reserve capacity for foreground operations, coalesce duplicates,
 and apply application-specific backpressure before starting optional work.
 Invalidate abandoned workflows without launching their replacements before the
 active lifecycle settles.
+
+Budget retained native wrappers as well as simultaneous connections. Include
+completed wrappers awaiting reuse, pooled wrappers, and quarantined wrappers;
+a long grace period can exhaust capacity during a burst of successful requests.
+Carry foreground priority through authentication and dependent requests. Do not
+leave a user action waiting indefinitely for connected Wi-Fi before submitting
+the access/request workflow that can wake networking.
 
 Apply retries to logical operations, not blindly to handles. Use exponential
 backoff, a retry ceiling, and per-origin circuit breakers. Do not let each retry

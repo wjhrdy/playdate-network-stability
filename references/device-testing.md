@@ -8,6 +8,7 @@ Exercise dimensions independently before combining them:
 | --- | --- |
 | Transport | Lua HTTP, C HTTP, TCP, mixed Lua/C |
 | Operation | short request, upload, download, redirect, persistent connection |
+| HTTP framing | content length, chunked, connection-delimited without content length, truncated body |
 | Transition | start, cancel, replace, retry, foreground/background handoff |
 | Timing | before connect, sending, receiving, quiet/idle, after extended use |
 | Network | good Wi-Fi, weak Wi-Fi, AP loss, reconnect |
@@ -18,6 +19,17 @@ Include rapid operation replacement to expose races and long steady runs to
 expose retention. Avoid changing several ownership rules and watchdogs in the
 same build.
 
+For mixed workloads, combine long playback or another persistent operation,
+foreground browsing, a burst of successful downloads, and a partial disconnect.
+Test foreground entry while Wi-Fi reports disconnected and a user action whose
+authentication token expires before its dependent request. Exercise late
+callbacks during retirement so they restart any reuse quiet interval.
+
+On SDK/OS 3.1.2, rerun chunked and missing-`Content-Length` cases to cover the
+[HTTP parser fixes](playdate-network-api.md#sdkos-312-http-fixes). A short replay
+past a previous crash point verifies that regression only; it does not replace
+a soak across background intervals and accumulated failures.
+
 ## Telemetry
 
 Log monotonic timestamps and a build identifier. Prefer counters over verbose
@@ -25,6 +37,8 @@ per-frame logs:
 
 - HTTP/TCP objects created, reused, active, closing, retired, quarantined, and
   pinned;
+- retained-wrapper totals, reuse-wait counts, callback quiet age, and capacity
+  rejections (for example, `http_capacity_blocks`);
 - operation IDs/generations, origin, purpose, priority, and state transitions;
 - access/open callbacks pending and request-complete/connection-closed callbacks
   seen;
@@ -43,6 +57,10 @@ diagnostic logs periodically and at ordinary state transitions.
 
 - Increasing created/pinned counts with flat reuse suggests incomplete terminal
   lifecycles or unsafe reuse criteria.
+- Successful requests with rising created/reuse-wait counts can exhaust wrapper
+  capacity even when active connections and heap readings remain low. Compare
+  crash PC/LR and fault registers with allocation chronology across reproductions;
+  an allocation-associated fault is evidence, not proof of its underlying cause.
 - Connected Wi-Fi plus zero progress and `NET_OK` suggests a half-open or silent
   native state; retain a bounded application watchdog.
 - Pending outbound bytes identify a send-side stall before response handling.

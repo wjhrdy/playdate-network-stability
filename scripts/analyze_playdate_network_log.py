@@ -22,6 +22,14 @@ EVENTS: dict[str, re.Pattern[str]] = {
     "connect_stall": re.compile(r"connect(?:ion)? (?:stalled|timeout)", re.I),
     "send_stall": re.compile(r"send stalled|outbound .* stalled", re.I),
     "session_limit": re.compile(r"session limit|quarantine full|cleanup busy", re.I),
+    "capacity_rejection": re.compile(r"capacity protected|capacity exhausted", re.I),
+    "partial_response": re.compile(
+        r"connection closed before response completed|short response body|truncated body",
+        re.I,
+    ),
+    "workflow_recovery": re.compile(
+        r"refreshing stream at|refreshing (?:archive|download).*recovery", re.I
+    ),
     "incomplete_lifecycle": re.compile(
         r"poison(?:ed|ing)|unsafe native.*lifecycle", re.I
     ),
